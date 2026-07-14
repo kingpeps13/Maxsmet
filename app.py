@@ -1,6 +1,13 @@
-# app.py - Строительная смета
+# app.py - Главный файл, управляет навигацией
 
 import streamlit as st
+from pages.main import show_main
+from pages.price_list import show_price_list
+from pages.estimate import show_estimate
+from pages.materials import show_materials
+from pages.clients import show_clients
+from pages.objects import show_objects
+from utils.helpers import init_session_state
 
 # Настройка страницы
 st.set_page_config(
@@ -10,56 +17,28 @@ st.set_page_config(
 )
 
 # Инициализация данных
-if 'initialized' not in st.session_state:
-    st.session_state.initialized = True
-    st.session_state.page = "Главная"
+init_session_state()
 
 # Боковая панель
 st.sidebar.title("🏗️ Строительная смета")
 st.sidebar.markdown("---")
 
-# Меню навигации
+# Навигация
 page = st.sidebar.radio(
     "Меню",
-    ["Главная", "📋 Смета", "📊 Прайс-лист", "🧾 Материалы", "👤 Клиенты", "🏗️ Объекты", "📁 Архив"]
+    ["Главная", "📋 Смета", "📊 Прайс-лист", "🧾 Материалы", "👤 Клиенты", "🏗️ Объекты"]
 )
 
 # Отображение выбранной страницы
 if page == "Главная":
-    st.title("🏗️ Строительная смета")
-    st.markdown("### Добро пожаловать!")
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("📋 Смет", "0")
-    with col2:
-        st.metric("👤 Клиентов", "0")
-    with col3:
-        st.metric("🏗️ Объектов", "0")
-    
-    st.info("ℹ️ Используйте меню слева для навигации")
-
-elif page == "📋 Смета":
-    st.title("📋 Создание сметы")
-    st.info("🚧 Страница в разработке")
-
+    show_main()
 elif page == "📊 Прайс-лист":
-    st.title("📊 Прайс-лист")
-    st.info("🚧 Страница в разработке")
-
+    show_price_list()
+elif page == "📋 Смета":
+    show_estimate()
 elif page == "🧾 Материалы":
-    st.title("🧾 Материалы")
-    st.info("🚧 Страница в разработке")
-
+    show_materials()
 elif page == "👤 Клиенты":
-    st.title("👤 Клиенты")
-    st.info("🚧 Страница в разработке")
-
+    show_clients()
 elif page == "🏗️ Объекты":
-    st.title("🏗️ Объекты")
-    st.info("🚧 Страница в разработке")
-
-elif page == "📁 Архив":
-    st.title("📁 Архив смет")
-    st.info("🚧 Страница в разработке")
+    show_objects()
