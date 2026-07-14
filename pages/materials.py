@@ -1,52 +1,118 @@
-# pages/materials.py - Страница материалов
+# pages/materials.py - Смета на материалы (как в Excel)
 
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 def show_materials():
-    st.title("🧾 Материалы")
-    st.markdown("### Управление материалами в смете")
+    st.title("🧾 Смета на материалы")
+    st.markdown("---")
     
-    # Инициализация материалов
-    if 'estimate_materials' not in st.session_state:
-        st.session_state.estimate_materials = []
+    # --- ИНФОРМАЦИЯ О СМЕТЕ ---
+    col1, col2 = st.columns(2)
+    with col1:
+        materials_name = st.text_input("Название сметы на материалы", 
+                                      f"Смета материалов №{len(st.session_state.get('materials_estimates', [])) + 1}")
+    with col2:
+        materials_date = st.date_input("Дата", datetime.now())
     
-    # Добавление материала
-    with st.expander("➕ Добавить материал", expanded=True):
-        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-        with col1:
-            name = st.text_input("Наименование материала", key="mat_name")
-        with col2:
-            unit = st.text_input("Ед. изм.", key="mat_unit")
-        with col3:
-            qty = st.number_input("Количество", min_value=0.0, step=1.0, key="mat_qty")
-        with col4:
-            price = st.number_input("Цена", min_value=0.0, step=10.0, key="mat_price")
-        
-        if st.button("➕ Добавить материал", key="add_mat"):
-            if name and unit and qty > 0 and price > 0:
-                st.session_state.estimate_materials.append({
-                    'name': name,
-                    'unit': unit,
-                    'quantity': qty,
-                    'price': price,
-                    'cost': qty * price
-                })
-                st.success(f"✅ Материал '{name}' добавлен!")
-                st.rerun()
-            else:
-                st.error("Заполните все поля")
+    st.markdown("---")
     
-    # Отображение материалов
-    if st.session_state.estimate_materials:
-        df = pd.DataFrame(st.session_state.estimate_materials)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        total = sum(m['cost'] for m in st.session_state.estimate_materials)
-        st.metric("💰 Итого материалы", f"{total:.2f} руб.")
-        
-        if st.button("🗑️ Очистить материалы"):
-            st.session_state.estimate_materials = []
+    # --- ДОБАВЛЕНИЕ МАТЕРИАЛА ---
+    st.subheader("➕ Добавить материал")
+    
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    
+    with col1:
+        name = st.text_input("Наименование материала", key="mat_name")
+        container = st.text_input("Тара (упаковка)", placeholder="например: 40 кг, 10 л", key="mat_container")
+    
+    with col2:
+        unit = st.text_input("Ед. изм.", key="mat_unit")
+    
+    with col3:
+        qty = st.number_input("Кол-во", min_value=0.0, step=1.0, key="mat_qty")
+    
+    with col4:
+        price = st.number_input("Цена (руб.)", min_value=0.0, step=10.0, key="mat_price")
+    
+    if st.button("➕ Добавить материал", key="add_mat"):
+        if name and unit and qty > 0 and price > 0:
+            if 'estimate_materials' not in st.session_state:
+                st.session_state.estimate_materials = []
+            
+            st.session_state.estimate_materials.append({
+                'name': name,
+                'container': container,
+                'unit': unit,
+                'quantity': qty,
+                'price': price,
+                'cost': qty * price
+            })
+            st.success(f"✅ Материал '{name}' добавлен!")
             st.rerun()
+        else:
+            st.error("Заполните все поля")
+    
+    st.markdown("---")
+    
+    # --- ОТОБРАЖЕНИЕ МАТЕРИАЛОВ ---
+    st.subheader("📄 Смета на материалы")
+    
+    if 'estimate_materials' in st.session_state and st.session_state.estimate_materials:
+        df = pd.DataFrame(st.session_state.estimate_materials)
+        
+        # Нумерация
+        df.insert(0, '№', range(1, len(df) + 1))
+        
+        # Колонки как в Excel
+        display_cols = ['№', 'name', 'container', 'unit', 'quantity', 'price', 'cost']
+        column_config = {
+            '№': '№ п/п',
+            'name': 'Наименование материала',
+            'container': 'Тара',
+            'unit': 'Ед. изм.',
+            'quantity': 'Кол-во',
+            'price': 'Цена, руб.',
+            'cost': 'Сумма, руб.'
+        }
+        
+        st.dataframe(
+            df[display_cols],
+            column_config=column_config,
+            hide_index=True,
+            use_container_width=True
+        )
+        
+        # --- ИТОГ ---
+        st.markdown("---")
+        total_cost = df['cost'].sum()
+        st.metric("💰 ИТОГО по материалам", f"{total_cost:,.2f} руб.")
+        
+        # --- КНОПКИ ---
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("💾 Сохранить смету материалов", key="save_materials"):
+                if materials_name:
+                    if 'materials_estimates' not in st.session_state:
+                        st.session_state.materials_estimates = []
+                    
+                    st.session_state.materials_estimates.append({
+                        'name': materials_name,
+                        'date': materials_date.strftime("%Y-%m-%d"),
+                        'items': st.session_state.estimate_materials.copy(),
+                        'total': total_cost
+                    })
+                    st.session_state.estimate_materials = []
+                    st.success("✅ Смета материалов сохранена!")
+                    st.rerun()
+                else:
+                    st.error("Введите название сметы")
+        
+        with col2:
+            if st.button("🗑️ Очистить материалы", key="clear_materials"):
+                st.session_state.estimate_materials = []
+                st.rerun()
     else:
         st.info("Нет добавленных материалов")
