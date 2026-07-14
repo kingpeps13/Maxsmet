@@ -1,4 +1,4 @@
-# app.py - Главный файл, управляет навигацией
+# app.py - Главный файл
 
 import streamlit as st
 from pages.main import show_main
