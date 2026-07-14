@@ -1,8 +1,9 @@
-# pages/materials.py - Смета на материалы (как в Excel)
+# pages/materials.py - Смета на материалы
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from utils.data_manager import save_materials_estimate, load_materials_estimates
 
 def show_materials():
     st.title("🧾 Смета на материалы")
@@ -12,7 +13,7 @@ def show_materials():
     col1, col2 = st.columns(2)
     with col1:
         materials_name = st.text_input("Название сметы на материалы", 
-                                      f"Смета материалов №{len(st.session_state.get('materials_estimates', [])) + 1}")
+                                      f"Смета материалов №{len(load_materials_estimates()) + 1}")
     with col2:
         materials_date = st.date_input("Дата", datetime.now())
     
@@ -61,11 +62,8 @@ def show_materials():
     
     if 'estimate_materials' in st.session_state and st.session_state.estimate_materials:
         df = pd.DataFrame(st.session_state.estimate_materials)
-        
-        # Нумерация
         df.insert(0, '№', range(1, len(df) + 1))
         
-        # Колонки как в Excel
         display_cols = ['№', 'name', 'container', 'unit', 'quantity', 'price', 'cost']
         column_config = {
             '№': '№ п/п',
@@ -90,23 +88,24 @@ def show_materials():
         st.metric("💰 ИТОГО по материалам", f"{total_cost:,.2f} руб.")
         
         # --- КНОПКИ ---
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
             if st.button("💾 Сохранить смету материалов", key="save_materials"):
                 if materials_name:
-                    if 'materials_estimates' not in st.session_state:
-                        st.session_state.materials_estimates = []
-                    
-                    st.session_state.materials_estimates.append({
+                    materials_data = {
                         'name': materials_name,
                         'date': materials_date.strftime("%Y-%m-%d"),
                         'items': st.session_state.estimate_materials.copy(),
                         'total': total_cost
-                    })
-                    st.session_state.estimate_materials = []
-                    st.success("✅ Смета материалов сохранена!")
-                    st.rerun()
+                    }
+                    
+                    if save_materials_estimate(materials_data):
+                        st.session_state.estimate_materials = []
+                        st.success("✅ Смета материалов сохранена в data/materials_estimates.json!")
+                        st.rerun()
+                    else:
+                        st.error("Ошибка сохранения")
                 else:
                     st.error("Введите название сметы")
         
@@ -114,5 +113,20 @@ def show_materials():
             if st.button("🗑️ Очистить материалы", key="clear_materials"):
                 st.session_state.estimate_materials = []
                 st.rerun()
+        
+        with col3:
+            # ЭКСПОРТ В EXCEL
+            if st.button("📊 Экспорт в Excel", key="export_materials_excel"):
+                output = pd.ExcelWriter('материалы.xlsx', engine='openpyxl')
+                df[display_cols].to_excel(output, sheet_name='Материалы', index=False)
+                output.close()
+                
+                with open('материалы.xlsx', 'rb') as f:
+                    st.download_button(
+                        label="📥 Скачать Excel",
+                        data=f,
+                        file_name=f"{materials_name}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
     else:
         st.info("Нет добавленных материалов")
