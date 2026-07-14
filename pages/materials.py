@@ -1,10 +1,33 @@
-# pages/materials.py - Смета на материалы (как в Excel)
+# pages/materials.py - Смета на материалы
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from utils.data_manager import save_materials_estimate, load_materials_estimates
 import io
+import json
+import os
+
+MATERIALS_FILE = 'data/materials_estimates.json'
+
+def save_materials_to_file(data):
+    """Сохранение сметы материалов в файл"""
+    try:
+        os.makedirs(os.path.dirname(MATERIALS_FILE), exist_ok=True)
+        
+        if os.path.exists(MATERIALS_FILE):
+            with open(MATERIALS_FILE, 'r', encoding='utf-8') as f:
+                estimates = json.load(f)
+        else:
+            estimates = []
+        
+        estimates.append(data)
+        
+        with open(MATERIALS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(estimates, f, ensure_ascii=False, indent=2, default=str)
+        return True
+    except Exception as e:
+        st.error(f"Ошибка сохранения: {e}")
+        return False
 
 def show_materials():
     st.title("🧾 Смета на материалы")
@@ -14,12 +37,11 @@ def show_materials():
     col1, col2 = st.columns(2)
     with col1:
         materials_name = st.text_input("Название сметы на материалы", 
-                                      f"Смета материалов №{len(load_materials_estimates()) + 1}")
+                                      f"Смета материалов №{len(st.session_state.materials_estimates) + 1}")
     
     with col2:
         materials_date = st.date_input("Дата", datetime.now())
     
-    # Клиент и объект
     col1, col2 = st.columns(2)
     with col1:
         client_options = [c['name'] for c in st.session_state.clients] + ["➕ Новый клиент"]
@@ -98,20 +120,17 @@ def show_materials():
             st.success(f"✅ Материал '{name}' добавлен!")
             st.rerun()
         else:
-            st.error("Заполните все поля (наименование, ед.изм., кол-во, цена)")
+            st.error("Заполните все поля")
     
     st.markdown("---")
     
-    # --- ОТОБРАЖЕНИЕ МАТЕРИАЛОВ ---
+    # --- ОТОБРАЖЕНИЕ ---
     st.subheader("📄 Смета на материалы")
     
     if 'estimate_materials' in st.session_state and st.session_state.estimate_materials:
         df = pd.DataFrame(st.session_state.estimate_materials)
-        
-        # Обновляем номера
         df['№'] = range(1, len(df) + 1)
         
-        # Колонки как в Excel (ваш файл)
         display_cols = ['№', 'name', 'container', 'unit', 'quantity', 'price', 'cost']
         column_config = {
             '№': '№',
@@ -130,20 +149,15 @@ def show_materials():
             use_container_width=True
         )
         
-        # --- ИТОГ ---
-        st.markdown("---")
         total_cost = df['cost'].sum()
-        
-        # Строка с итогом как в Excel
         st.markdown(f"### **ИТОГО: {total_cost:,.2f} руб.**")
         
-        # --- КНОПКИ ---
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            if st.button("💾 Сохранить смету", key="save_materials"):
+            if st.button("💾 Сохранить", key="save_materials"):
                 if materials_name and estimate_client and estimate_object:
-                    materials_data = {
+                    data = {
                         'name': materials_name,
                         'date': materials_date.strftime("%Y-%m-%d"),
                         'client': estimate_client,
@@ -152,14 +166,14 @@ def show_materials():
                         'total': total_cost
                     }
                     
-                    if save_materials_estimate(materials_data):
+                    if save_materials_to_file(data):
                         st.session_state.estimate_materials = []
-                        st.success("✅ Смета материалов сохранена!")
+                        st.success("✅ Сохранено!")
                         st.rerun()
                     else:
                         st.error("Ошибка сохранения")
                 else:
-                    st.error("Заполните название сметы, клиента и объект")
+                    st.error("Заполните название, клиента и объект")
         
         with col2:
             if st.button("🗑️ Очистить", key="clear_materials"):
@@ -167,46 +181,34 @@ def show_materials():
                 st.rerun()
         
         with col3:
-            # ЭКСПОРТ В EXCEL КАК В ВАШЕМ ФАЙЛЕ
-            if st.button("📊 Экспорт в Excel", key="export_materials_excel"):
-                export_materials_to_excel(df, materials_name, estimate_client, estimate_object, total_cost)
+            if st.button("📊 Экспорт в Excel", key="export_materials"):
+                export_materials_excel(df, materials_name, total_cost)
     else:
         st.info("Нет добавленных материалов")
 
-def export_materials_to_excel(df, filename, client, object_name, total):
-    """Экспорт материалов в Excel как в вашем файле"""
-    
-    # Создаем Excel файл в памяти
+def export_materials_excel(df, filename, total):
+    """Экспорт материалов в Excel"""
     output = io.BytesIO()
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # Копируем данные для экспорта
         export_df = df[['№', 'name', 'container', 'unit', 'quantity', 'price', 'cost']].copy()
         export_df.columns = ['№', 'Наименование материала', 'Тара', 'Ед-ца измер.', 'Кол-во', 'Цена, руб.', 'Сумма, руб.']
-        
-        # Записываем данные
         export_df.to_excel(writer, sheet_name='Материалы', index=False)
         
-        # Настройка ширины колонок (как в вашем файле)
         worksheet = writer.sheets['Материалы']
-        worksheet.column_dimensions['A'].width = 8   # №
-        worksheet.column_dimensions['B'].width = 35  # Наименование
-        worksheet.column_dimensions['C'].width = 15  # Тара
-        worksheet.column_dimensions['D'].width = 12  # Ед-ца измер.
-        worksheet.column_dimensions['E'].width = 10  # Кол-во
-        worksheet.column_dimensions['F'].width = 15  # Цена
-        worksheet.column_dimensions['G'].width = 15  # Сумма
+        worksheet.column_dimensions['A'].width = 8
+        worksheet.column_dimensions['B'].width = 35
+        worksheet.column_dimensions['C'].width = 15
+        worksheet.column_dimensions['D'].width = 12
+        worksheet.column_dimensions['E'].width = 10
+        worksheet.column_dimensions['F'].width = 15
+        worksheet.column_dimensions['G'].width = 15
         
-        # Добавляем строку с итогом
-        from openpyxl.utils import get_column_letter
+        from openpyxl.styles import Font
         last_row = len(export_df) + 2
         worksheet.cell(row=last_row, column=7, value=f"ИТОГО: {total:,.2f} руб.")
-        
-        # Жирный шрифт для итога
-        from openpyxl.styles import Font
         worksheet.cell(row=last_row, column=7).font = Font(bold=True)
     
-    # Скачивание
     st.download_button(
         label="📥 Скачать Excel",
         data=output.getvalue(),
