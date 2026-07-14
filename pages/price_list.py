@@ -1,12 +1,9 @@
 # pages/price_list.py - Прайс-лист с управлением
 
+# pages/price_list.py
 import streamlit as st
 import pandas as pd
-from utils.data_manager import (
-    load_price_list, save_price_list, 
-    add_work, delete_work, update_work,
-    get_categories, get_work_types
-)
+from utils.data_manager import load_price_list, save_price_list, get_categories, get_work_types
 
 def show_price_list():
     st.title("📊 Прайс-лист работ")
