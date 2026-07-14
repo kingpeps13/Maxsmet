@@ -125,8 +125,10 @@ def load_estimates():
 
 # ========== СМЕТЫ НА МАТЕРИАЛЫ ==========
 
+# utils/data_manager.py - Добавьте эти функции
+
 def save_materials_estimate(data):
-    """Сохранение сметы на материалы"""
+    """Сохранение сметы на материалы с клиентом и объектом"""
     try:
         os.makedirs(os.path.dirname(MATERIALS_FILE), exist_ok=True)
         
@@ -197,3 +199,4 @@ def update_work(work_type, category, work_name, unit, price):
             }
             return save_price_list(data)
     return False
+    
